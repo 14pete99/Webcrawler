@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webcrawler"
+version = "0.1.0"
+description = "Web crawler with stealth features and FastAPI API"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx[socks]",
+    "pydantic-settings",
+    "requests",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[project.scripts]
+crawl-images = "crawl_images:main"
