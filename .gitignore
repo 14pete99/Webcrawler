@@ -1,0 +1,34 @@
+# Images
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.svg
+*.ico
+*.webp
+*.tiff
+*.tif
+
+# Output directories
+output/
+output_screenshot/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Environment
+.env
+
+# Data (sessions/cookies)
+data/sessions/
+
+# IDE
+.vscode/
+.idea/
