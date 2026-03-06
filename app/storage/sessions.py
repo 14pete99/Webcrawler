@@ -1,0 +1,55 @@
+"""Cookie jar persistence per session."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from ..config import get_settings
+from ..models.session import SessionInfo
+
+
+def _sessions_dir() -> Path:
+    d = Path(get_settings().sessions_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def list_sessions() -> list[SessionInfo]:
+    """Return metadata for all persisted sessions."""
+    sessions: list[SessionInfo] = []
+    for f in _sessions_dir().glob("*.json"):
+        data = json.loads(f.read_text(encoding="utf-8"))
+        cookies = data.get("cookies", [])
+        sessions.append(
+            SessionInfo(
+                id=f.stem,
+                has_cookies=bool(cookies),
+                cookie_count=len(cookies),
+            )
+        )
+    return sessions
+
+
+def get_session_cookies(session_id: str) -> list[dict] | None:
+    """Load cookies for a session."""
+    path = _sessions_dir() / f"{session_id}.json"
+    if not path.is_file():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data.get("cookies", [])
+
+
+def save_session_cookies(session_id: str, cookies: list[dict]) -> None:
+    """Persist cookies for a session."""
+    path = _sessions_dir() / f"{session_id}.json"
+    path.write_text(json.dumps({"cookies": cookies}, indent=2), encoding="utf-8")
+
+
+def delete_session(session_id: str) -> bool:
+    """Delete a session file. Returns ``True`` if it existed."""
+    path = _sessions_dir() / f"{session_id}.json"
+    if path.is_file():
+        path.unlink()
+        return True
+    return False
