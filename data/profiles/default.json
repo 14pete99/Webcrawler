@@ -1,0 +1,12 @@
+{
+  "id": "default",
+  "name": "Default Stealth Profile",
+  "config": {
+    "user_agent": "random",
+    "headers": "realistic",
+    "js_injection": true,
+    "viewport": "random",
+    "delay_min_ms": 1000,
+    "delay_max_ms": 3000
+  }
+}
