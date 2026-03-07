@@ -1,8 +1,9 @@
-"""Async image downloader with stealth support."""
+"""Async image downloader with stealth support and MinIO storage."""
 
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from pathlib import Path
 from urllib.parse import urlparse
@@ -15,6 +16,8 @@ from app.services.image_compliance import enforce_compliance
 from app.stealth.delays import async_delay
 from app.stealth.headers import build_image_headers
 from app.stealth.pipeline import StealthContext
+
+logger = logging.getLogger(__name__)
 
 
 def _derive_filename(src: str, content_type: str | None) -> str:
@@ -40,6 +43,34 @@ def _unique_path(output_dir: Path, name: str) -> Path:
         dest = output_dir / f"{stem}_{counter}{dest.suffix}"
         counter += 1
     return dest
+
+
+def _upload_to_minio(paths: list[Path], content_type: str | None) -> list[str]:
+    """Upload compliant image files to MinIO, returning object keys.
+
+    Returns an empty list if MinIO is not available or upload fails,
+    allowing graceful fallback to local filesystem paths.
+    """
+    try:
+        from app.storage.minio_store import get_minio_client, upload_image, get_presigned_url
+        # Check if client is initialized (will be None if init_minio was never called)
+        get_minio_client()
+    except Exception:
+        return []
+
+    keys: list[str] = []
+    mime = content_type or "application/octet-stream"
+    for path in paths:
+        try:
+            data = path.read_bytes()
+            object_name = path.name
+            upload_image(data, object_name, content_type=mime)
+            keys.append(object_name)
+            logger.info("Uploaded to MinIO: %s", object_name)
+        except Exception as e:
+            logger.warning("MinIO upload failed for %s: %s", path.name, e)
+            return []
+    return keys
 
 
 async def download_image(
@@ -84,6 +115,19 @@ async def download_image(
 
         # Enforce Claude Code image limits (20 MB / 8000px max dimension)
         compliant_paths = enforce_compliance(dest)
+
+        # Upload to MinIO if available
+        minio_keys = _upload_to_minio(compliant_paths, content_type)
+
+        if minio_keys:
+            if len(minio_keys) == 1:
+                return DownloadResult(src=src, file=minio_keys[0])
+            return DownloadResult(
+                src=src,
+                file=minio_keys[0],
+                extra_files=minio_keys[1:],
+            )
+
         if len(compliant_paths) == 1:
             return DownloadResult(src=src, file=str(compliant_paths[0]))
         # Image was split into tiles — return first tile, extras attached

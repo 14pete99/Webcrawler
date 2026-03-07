@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from fastapi import FastAPI
 
 from .config import get_settings
 from .routers import crawl, download, profiles, sessions
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -18,6 +21,15 @@ async def lifespan(app: FastAPI):
     Path(settings.profiles_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.sessions_dir).mkdir(parents=True, exist_ok=True)
     Path(settings.default_output_dir).mkdir(parents=True, exist_ok=True)
+
+    # Initialize MinIO storage
+    try:
+        from .storage.minio_store import init_minio
+        init_minio(settings)
+        logger.info("MinIO storage initialized (bucket: %s)", settings.minio_bucket)
+    except Exception as e:
+        logger.warning("MinIO not available, falling back to local storage: %s", e)
+
     yield
 
 

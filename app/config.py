@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     captcha_api_key: str | None = None
     captcha_provider: str = "2captcha"  # "2captcha" | "anticaptcha"
 
+    # MinIO object storage
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "crawled-images"
+    minio_secure: bool = False
+
     model_config = {"env_prefix": "CRAWLER_"}
 
 
