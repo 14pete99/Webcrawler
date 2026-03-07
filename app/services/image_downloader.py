@@ -11,6 +11,7 @@ import httpx
 
 from app.models.crawl import ImageInfo
 from app.models.download import DownloadResult
+from app.services.image_compliance import enforce_compliance
 from app.stealth.delays import async_delay
 from app.stealth.headers import build_image_headers
 from app.stealth.pipeline import StealthContext
@@ -81,7 +82,16 @@ async def download_image(
         output_dir.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(resp.content)
 
-        return DownloadResult(src=src, file=str(dest))
+        # Enforce Claude Code image limits (20 MB / 8000px max dimension)
+        compliant_paths = enforce_compliance(dest)
+        if len(compliant_paths) == 1:
+            return DownloadResult(src=src, file=str(compliant_paths[0]))
+        # Image was split into tiles — return first tile, extras attached
+        return DownloadResult(
+            src=src,
+            file=str(compliant_paths[0]),
+            extra_files=[str(p) for p in compliant_paths[1:]],
+        )
     except Exception as e:
         return DownloadResult(src=src, error=str(e))
 

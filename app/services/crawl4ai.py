@@ -10,6 +10,7 @@ from urllib.parse import urljoin
 import httpx
 
 from app.models.crawl import ImageInfo
+from app.services.image_compliance import enforce_compliance
 from app.stealth.pipeline import StealthContext
 
 
@@ -172,6 +173,7 @@ async def crawl_url(
     all_images: list[ImageInfo] = []
     errors: list[str] = []
     screenshot_path: str | None = None
+    screenshot_tiles: list[str] | None = None
 
     for result in results:
         if not result or not result.get("success"):
@@ -184,7 +186,11 @@ async def crawl_url(
             output_dir.mkdir(parents=True, exist_ok=True)
             ss_path = output_dir / "screenshot.png"
             ss_path.write_bytes(base64.b64decode(screenshot_b64))
-            screenshot_path = str(ss_path)
+            # Enforce Claude Code image limits (20 MB / 8000px)
+            compliant = enforce_compliance(ss_path)
+            screenshot_path = str(compliant[0])
+            if len(compliant) > 1:
+                screenshot_tiles = [str(p) for p in compliant]
 
         # Images
         media = result.get("media", {})
@@ -202,9 +208,12 @@ async def crawl_url(
                 )
             )
 
-    return {
+    result_dict = {
         "success": len(errors) == 0,
         "images": all_images,
         "screenshot_path": screenshot_path,
         "errors": errors,
     }
+    if screenshot_tiles:
+        result_dict["screenshot_tiles"] = screenshot_tiles
+    return result_dict

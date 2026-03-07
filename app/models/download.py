@@ -35,6 +35,7 @@ class DownloadResult(BaseModel):
     file: str | None = None
     alt: str = ""
     error: str | None = None
+    extra_files: list[str] | None = None
 
 
 class DownloadResponse(BaseModel):

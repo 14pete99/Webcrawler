@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 from app.models.stealth import StealthConfig
-from app.services.crawl4ai import crawl_url, extract_images, extract_screenshot
+from app.services.crawl4ai import crawl_url
 from app.services.image_downloader import download_images
 from app.services.proxy import ProxyPool
 from app.stealth.pipeline import build_stealth_context
@@ -48,43 +48,52 @@ async def _main(args) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     proxy_pool = ProxyPool.from_args(args.proxy, args.proxy_file)
-    if proxy_pool:
-        print(f"Using {len(proxy_pool)} proxy/proxies (rotating)")
+    if not proxy_pool.is_empty:
+        print(f"Using {proxy_pool.count} proxy/proxies (rotating)")
 
-    crawl_proxy = proxy_pool.next()
+    crawl_entry = proxy_pool.next()
+    crawl_proxy = crawl_entry.url if crawl_entry else None
 
     print(f"Crawling: {args.url}")
     data = await crawl_url(
         args.url,
-        stealth,
         screenshot=args.screenshot,
+        stealth=stealth,
         proxy=crawl_proxy,
         session_id=args.session_id,
+        output_dir=output_dir,
     )
 
-    if args.screenshot:
-        sp = extract_screenshot(data, output_dir)
-        if sp:
-            print(f"Screenshot saved: {sp}")
+    if args.screenshot and data.get("screenshot_path"):
+        print(f"Screenshot saved: {data['screenshot_path']}")
 
-    images = extract_images(data, args.url)
+    images = data.get("images", [])
     print(f"Found {len(images)} images")
+
+    if data.get("errors"):
+        for err in data["errors"]:
+            print(f"  Crawl error: {err}")
 
     if not images:
         print("No downloadable images found.")
         return
 
-    dl_proxy = proxy_pool.next()
+    dl_entry = proxy_pool.next()
+    dl_proxy = dl_entry.url if dl_entry else None
     print(f"\nDownloading {len(images)} images to {output_dir}/")
-    manifest, errors = await download_images(images, output_dir, stealth, proxy=dl_proxy)
+    results = await download_images(images, output_dir, stealth=stealth, proxy=dl_proxy)
+
+    errors = [r for r in results if r.error]
+    successes = [r for r in results if r.file]
 
     for err in errors:
-        print(f"  {err}")
+        print(f"  Error [{err.src}]: {err.error}")
 
+    manifest = [r.model_dump(exclude_none=True) for r in successes]
     manifest_path = output_dir / "images.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    print(f"\nDone: {len(manifest)}/{len(images)} images saved")
+    print(f"\nDone: {len(successes)}/{len(images)} images saved")
     print(f"Manifest: {manifest_path}")
 
 

@@ -13,6 +13,7 @@ dependencies = [
     "httpx[socks]",
     "pydantic-settings",
     "requests",
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]

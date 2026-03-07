@@ -9,3 +9,17 @@ services:
     volumes:
       - ./downloads:/app/downloads
       - ./output:/app/output
+
+  webcrawler:
+    build: .
+    container_name: webcrawler
+    ports:
+      - "8888:8000"
+    depends_on:
+      - crawl4ai
+    environment:
+      - CRAWLER_CRAWL4AI_API=http://crawl4ai:11235
+    volumes:
+      - ./output:/app/output
+      - ./data:/app/data
+    restart: unless-stopped
