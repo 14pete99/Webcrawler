@@ -1,0 +1,16 @@
+{
+  "$schema": "./scripts/features-schema.json",
+  "version": 1,
+  "features": [
+    {
+      "id": "image-crawler",
+      "name": "Image Crawler CLI",
+      "description": "Crawl a URL via crawl4ai and download discovered images",
+      "critical_files": [
+        "crawl_images.py",
+        "docker-compose.yml"
+      ],
+      "api_endpoints": []
+    }
+  ]
+}

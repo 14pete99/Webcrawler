@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.redbook.com.au)",
+      "WebFetch(domain:www.greenvehicleguide.gov.au)",
+      "WebFetch(domain:data.gov.au)",
+      "WebSearch",
+      "Bash(pip install -U crawl4ai)",
+      "Bash(docker --version)",
+      "Bash(docker pull unclecode/crawl4ai:latest)",
+      "Bash(docker compose up -d)",
+      "Bash(curl -s http://localhost:11235/health)",
+      "Bash(curl -s http://localhost:11235/docs)",
+      "Bash(curl -s http://localhost:11235/openapi.json)",
+      "Bash(python -m json.tool)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''\\\\n''.join\\(d[''paths''].keys\\(\\)\\)\\)\")",
+      "Bash(curl -s -X POST http://localhost:11235/screenshot -H \"Content-Type: application/json\" -d '{\"\"url\"\": \"\"https://news.ycombinator.com\"\"}' -o \"e:/OneDrive/Apps/Webcrawler/test_screenshot.png\" -w \"\\\\nHTTP Status: %{http_code}\\\\nSize: %{size_download} bytes\\\\n\")",
+      "WebFetch(domain:docs.crawl4ai.com)",
+      "Bash(docker ps --filter name=crawl4ai --format \"{{.Names}} {{.Status}}\")",
+      "Bash(pip show requests)",
+      "Bash(python crawl_images.py \"https://books.toscrape.com/\" --output-dir ./output)",
+      "Bash(python crawl_images.py \"https://books.toscrape.com/\" --output-dir ./output_screenshot --screenshot)",
+      "Bash(gh repo create Webcrawler --public --source=. --push --description \"Web crawler with stealth/anti-detection features, powered by crawl4ai\")",
+      "Bash(python \"e:/OneDrive/Apps/Webcrawler/scripts/validate-features.py\")"
+    ]
+  }
+}
