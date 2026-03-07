@@ -14,7 +14,10 @@ class SessionInfo(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_used: datetime = Field(default_factory=datetime.utcnow)
     has_cookies: bool = Field(default=False, description="Whether cookie jar has entries")
+    cookie_count: int = Field(default=0, description="Number of cookies stored")
     has_browser_session: bool = Field(
         default=False,
         description="Whether a crawl4ai browser session exists",
     )
+    has_local_storage: bool = Field(default=False, description="Whether localStorage data is stored")
+    fingerprint_seed: int | None = Field(default=None, description="Fingerprint seed for session consistency")

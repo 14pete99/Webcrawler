@@ -3,9 +3,66 @@
 from __future__ import annotations
 
 
+def generate_headers(
+    user_agent: str,
+    strategy: str | None = "realistic",
+    referrer: str | None = None,
+    cache_state: dict | None = None,
+) -> dict[str, str]:
+    """Generate HTTP headers with referrer and cache support.
+
+    Args:
+        user_agent: User-agent string.
+        strategy: Header strategy.
+        referrer: Referer URL to include.
+        cache_state: Dict with 'etag' and/or 'last_modified' for conditional requests.
+
+    Returns:
+        Dict of HTTP headers.
+    """
+    # Build UA info dict for internal use
+    ua_info: dict[str, str] | None = None
+    if user_agent:
+        browser = "chrome"
+        for name in ("firefox", "edg", "chrome", "safari"):
+            if name.lower() in user_agent.lower():
+                browser = "edge" if name == "edg" else name
+                break
+        platform = "mobile" if "Mobile" in user_agent else "desktop"
+        ua_info = {"ua": user_agent, "browser": browser, "platform": platform}
+
+    headers = build_headers(ua_info, strategy)
+
+    if referrer:
+        headers["Referer"] = referrer
+
+    if cache_state:
+        headers = add_conditional_headers(
+            headers,
+            etag=cache_state.get("etag"),
+            last_modified=cache_state.get("last_modified"),
+        )
+
+    return headers
+
+
+def add_conditional_headers(
+    headers: dict[str, str],
+    etag: str | None = None,
+    last_modified: str | None = None,
+) -> dict[str, str]:
+    """Add conditional request headers for cache validation."""
+    if etag:
+        headers["If-None-Match"] = etag
+    if last_modified:
+        headers["If-Modified-Since"] = last_modified
+    return headers
+
+
 def build_headers(
     ua_info: dict[str, str] | None,
     strategy: str | None = "realistic",
+    referrer: str | None = None,
 ) -> dict[str, str]:
     """Generate HTTP headers that match the given user agent.
 
@@ -13,6 +70,7 @@ def build_headers(
         ua_info: Dict from user_agent.pick_user_agent (ua, browser, platform).
         strategy: 'realistic' for full header set, 'minimal' for bare minimum,
                   or None to return empty dict.
+        referrer: Optional Referer header value.
 
     Returns:
         Dict of HTTP headers.
@@ -49,6 +107,9 @@ def build_headers(
         headers["Sec-Fetch-User"] = "?1"
 
     headers["Upgrade-Insecure-Requests"] = "1"
+
+    if referrer:
+        headers["Referer"] = referrer
 
     return headers
 

@@ -108,13 +108,9 @@ async def download_images(
     Returns:
         List of DownloadResult objects.
     """
-    transport = httpx.AsyncHTTPTransport(proxy=proxy) if proxy else None
-    async with httpx.AsyncClient(
-        transport=transport,
-        timeout=30,
-        follow_redirects=True,
-        cookies=cookies,
-    ) as client:
+    from .http_client import create_stealth_client
+
+    async with create_stealth_client(stealth, proxy=proxy) as client:
         results: list[DownloadResult] = []
         for img in images:
             result = await download_image(

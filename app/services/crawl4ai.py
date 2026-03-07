@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import uuid
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -22,6 +23,8 @@ async def crawl_url(
     session_id: str | None = None,
     output_dir: Path | None = None,
     timeout: float = 120,
+    captcha_solver: object | None = None,
+    cloudflare_bypass: bool = False,
 ) -> dict:
     """Submit a crawl request to crawl4ai and return parsed results.
 
@@ -59,19 +62,107 @@ async def crawl_url(
             browser_params["viewport_height"] = h
         if stealth.js_injection:
             crawler_params["js_code"] = stealth.js_injection
+        # Geo consistency: set browser timezone/locale
+        if stealth.geo_profile:
+            browser_params["timezone_id"] = stealth.geo_profile.timezone
+            browser_params["locale"] = stealth.geo_profile.locale
 
     payload: dict = {
         "urls": [url],
         "browser_config": {"type": "BrowserConfig", "params": browser_params},
         "crawler_config": {"type": "CrawlerRunConfig", "params": crawler_params},
     }
-    if session_id:
-        payload["session_id"] = session_id
+    # Behavioral scripts require a session to persist the browser tab
+    effective_session_id = session_id
+    if stealth and stealth.behavior_scripts and not effective_session_id:
+        effective_session_id = f"auto-{uuid.uuid4().hex[:8]}"
+
+    if effective_session_id:
+        payload["session_id"] = effective_session_id
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         resp = await client.post(f"{api_base}/crawl", json=payload)
         resp.raise_for_status()
         data = resp.json()
+
+        # Execute behavioral simulation scripts post-load
+        if stealth and stealth.behavior_scripts and effective_session_id:
+            behavior_payload = {
+                "urls": [url],
+                "session_id": effective_session_id,
+                "browser_config": {"type": "BrowserConfig", "params": browser_params},
+                "crawler_config": {"type": "CrawlerRunConfig", "params": {
+                    "js_code": stealth.behavior_scripts,
+                    "wait_for_images": False,
+                }},
+            }
+            try:
+                await client.post(f"{api_base}/crawl", json=behavior_payload)
+            except Exception:
+                pass  # Behavioral simulation is best-effort
+
+    # Cloudflare challenge retry logic
+    if cloudflare_bypass:
+        from app.stealth.cloudflare import (
+            build_cf_bypass_config,
+            detect_challenge_type,
+            detect_cloudflare_challenge,
+            turnstile_callback_js,
+        )
+
+        raw_results = data.get("results", data.get("result", []))
+        if not isinstance(raw_results, list):
+            raw_results = [raw_results]
+
+        for _retry in range(2):  # Max 2 retries
+            html_content = ""
+            for r in raw_results:
+                if r and r.get("html"):
+                    html_content = r["html"]
+                    break
+
+            if not html_content or not detect_cloudflare_challenge(html_content):
+                break
+
+            challenge_type = detect_challenge_type(html_content)
+            if not challenge_type:
+                break
+
+            cf_params = build_cf_bypass_config(challenge_type)
+            retry_crawler_params = {**crawler_params, **cf_params}
+
+            # For Turnstile challenges, try CAPTCHA solver if available
+            if challenge_type == "turnstile" and captcha_solver:
+                try:
+                    import re
+
+                    site_key_match = re.search(
+                        r'data-sitekey=["\']([^"\']+)', html_content
+                    )
+                    if site_key_match:
+                        token = await captcha_solver.solve_turnstile(
+                            site_key_match.group(1), url
+                        )
+                        retry_crawler_params["js_code"] = (
+                            crawler_params.get("js_code", "")
+                            + "\n"
+                            + turnstile_callback_js(token)
+                        )
+                except Exception:
+                    pass  # Fall back to normal retry
+
+            retry_payload = {
+                "urls": [url],
+                "browser_config": {"type": "BrowserConfig", "params": browser_params},
+                "crawler_config": {"type": "CrawlerRunConfig", "params": retry_crawler_params},
+            }
+            if effective_session_id:
+                retry_payload["session_id"] = effective_session_id
+
+            async with httpx.AsyncClient(timeout=timeout) as retry_client:
+                retry_resp = await retry_client.post(f"{api_base}/crawl", json=retry_payload)
+                retry_resp.raise_for_status()
+                data = retry_resp.json()
 
     # Parse results
     results = data.get("results", data.get("result", []))

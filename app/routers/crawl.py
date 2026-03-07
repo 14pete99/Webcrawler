@@ -17,7 +17,7 @@ from ..storage.profiles import get_profile
 router = APIRouter(tags=["crawl"])
 
 
-def _resolve_stealth(request: CrawlRequest):
+def _resolve_stealth(request: CrawlRequest, proxy_country: str | None = None):
     """Merge profile + inline stealth config, inline wins."""
     from ..models.stealth import StealthConfig
 
@@ -29,16 +29,28 @@ def _resolve_stealth(request: CrawlRequest):
     if request.stealth:
         override = request.stealth.model_dump(exclude_unset=True)
         config = config.model_copy(update=override)
-    return build_stealth_context(config)
+    return config, build_stealth_context(config, target_url=request.url, proxy_country=proxy_country)
 
 
 @router.post("/crawl", response_model=CrawlResponse)
 async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
     """Crawl a URL and optionally download discovered images."""
-    stealth = _resolve_stealth(request)
     proxy_pool = ProxyPool.from_args(request.proxy, request.proxy_file)
-    crawl_proxy = proxy_pool.next()
+    crawl_proxy_entry = proxy_pool.next()
+    crawl_proxy = crawl_proxy_entry.url if crawl_proxy_entry else None
+    proxy_country = crawl_proxy_entry.country if crawl_proxy_entry else None
+    stealth_config, stealth = _resolve_stealth(request, proxy_country=proxy_country)
     output_dir = Path(request.output_dir)
+
+    # CAPTCHA solver setup
+    captcha_solver = None
+    if stealth_config.captcha_solving:
+        from ..config import get_settings
+        from ..services.captcha import CaptchaSolver
+
+        settings = get_settings()
+        if settings.captcha_api_key:
+            captcha_solver = CaptchaSolver(settings.captcha_api_key, settings.captcha_provider)
 
     try:
         data = await crawl_url(
@@ -48,6 +60,8 @@ async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
             proxy=crawl_proxy,
             session_id=request.session_id,
             output_dir=output_dir,
+            captcha_solver=captcha_solver,
+            cloudflare_bypass=stealth_config.cloudflare_bypass,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))
@@ -66,7 +80,8 @@ async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
             errors=errors,
         )
 
-    dl_proxy = proxy_pool.next()
+    dl_proxy_entry = proxy_pool.next()
+    dl_proxy = dl_proxy_entry.url if dl_proxy_entry else None
     results = await download_images(
         images, output_dir, stealth=stealth, proxy=dl_proxy, referer=request.url,
     )
