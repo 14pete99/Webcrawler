@@ -13,6 +13,13 @@
     "audio_spoof": true,
     "hardware_spoof": true,
     "font_mask": true,
-    "fingerprint_seed": null
+    "fingerprint_seed": null,
+    "mouse_simulation": true,
+    "scroll_simulation": true,
+    "keyboard_simulation": true,
+    "dwell_time": true,
+    "cookie_consent_dismiss": true,
+    "referrer_chain": true,
+    "cloudflare_bypass": true
   }
 }

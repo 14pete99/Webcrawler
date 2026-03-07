@@ -38,6 +38,11 @@ def _build_config(args) -> StealthConfig:
             config.delay_min_ms = int(parts[0])
             config.delay_max_ms = int(parts[1])
 
+    if args.cloudflare_bypass:
+        config.cloudflare_bypass = True
+    if args.captcha_solving:
+        config.captcha_solving = True
+
     return config
 
 
@@ -107,6 +112,8 @@ def main():
     parser.add_argument("--profile", default=None, help="Stealth profile id to load (e.g. 'default')")
     parser.add_argument("--delay", default=None, help="Delay range in ms, e.g. '1000-3000'")
     parser.add_argument("--session-id", default=None, help="Session id for cookie persistence")
+    parser.add_argument("--cloudflare-bypass", action="store_true", help="Detect and attempt to bypass Cloudflare challenges")
+    parser.add_argument("--captcha-solving", action="store_true", help="Enable external CAPTCHA solver (requires CRAWLER_CAPTCHA_API_KEY)")
     args = parser.parse_args()
 
     asyncio.run(_main(args))

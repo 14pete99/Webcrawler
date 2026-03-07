@@ -61,8 +61,25 @@ async def crawl_url(
             w, h = stealth.viewport
             browser_params["viewport_width"] = w
             browser_params["viewport_height"] = h
+
+        # Combine pre-load JS and behavior scripts into a single injection.
+        # Behavior scripts are wrapped in a setTimeout so they execute post-load
+        # while the pre-load patches (fingerprint spoofing) run immediately.
+        js_parts: list[str] = []
         if stealth.js_injection:
-            crawler_params["js_code"] = stealth.js_injection
+            js_parts.append(stealth.js_injection)
+        if stealth.behavior_scripts:
+            # Wrap each behavior script in setTimeout to run after page settles
+            for script in stealth.behavior_scripts:
+                js_parts.append(
+                    f"setTimeout(function() {{ {script} }}, 2000);"
+                )
+            # Allow extra time for behavior scripts to complete
+            crawler_params["delay_before_return_html"] = 5.0
+
+        if js_parts:
+            crawler_params["js_code"] = "\n".join(js_parts)
+
         # Geo consistency: set browser timezone/locale
         if stealth.geo_profile:
             browser_params["timezone_id"] = stealth.geo_profile.timezone
@@ -73,34 +90,27 @@ async def crawl_url(
         "browser_config": {"type": "BrowserConfig", "params": browser_params},
         "crawler_config": {"type": "CrawlerRunConfig", "params": crawler_params},
     }
-    # Behavioral scripts require a session to persist the browser tab
-    effective_session_id = session_id
-    if stealth and stealth.behavior_scripts and not effective_session_id:
-        effective_session_id = f"auto-{uuid.uuid4().hex[:8]}"
-
-    if effective_session_id:
-        payload["session_id"] = effective_session_id
+    if session_id:
+        payload["session_id"] = session_id
 
     async with httpx.AsyncClient(timeout=timeout) as client:
-        resp = await client.post(f"{api_base}/crawl", json=payload)
-        resp.raise_for_status()
+        try:
+            resp = await client.post(f"{api_base}/crawl", json=payload)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 500:
+                # crawl4ai internal error — return a structured error
+                # instead of crashing the entire CLI
+                return {
+                    "success": False,
+                    "images": [],
+                    "screenshot_path": None,
+                    "errors": [
+                        f"crawl4ai returned 500: {exc.response.text[:200]}"
+                    ],
+                }
+            raise
         data = resp.json()
-
-        # Execute behavioral simulation scripts post-load
-        if stealth and stealth.behavior_scripts and effective_session_id:
-            behavior_payload = {
-                "urls": [url],
-                "session_id": effective_session_id,
-                "browser_config": {"type": "BrowserConfig", "params": browser_params},
-                "crawler_config": {"type": "CrawlerRunConfig", "params": {
-                    "js_code": stealth.behavior_scripts,
-                    "wait_for_images": False,
-                }},
-            }
-            try:
-                await client.post(f"{api_base}/crawl", json=behavior_payload)
-            except Exception:
-                pass  # Behavioral simulation is best-effort
 
     # Cloudflare challenge retry logic
     if cloudflare_bypass:
@@ -157,8 +167,8 @@ async def crawl_url(
                 "browser_config": {"type": "BrowserConfig", "params": browser_params},
                 "crawler_config": {"type": "CrawlerRunConfig", "params": retry_crawler_params},
             }
-            if effective_session_id:
-                retry_payload["session_id"] = effective_session_id
+            if session_id:
+                retry_payload["session_id"] = session_id
 
             async with httpx.AsyncClient(timeout=timeout) as retry_client:
                 retry_resp = await retry_client.post(f"{api_base}/crawl", json=retry_payload)

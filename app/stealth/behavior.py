@@ -136,6 +136,10 @@ def build_behavior_script(
     if config.scroll_simulation:
         scripts.append(generate_scroll_js())
 
+    if config.keyboard_simulation:
+        # Simulate a short idle typing sequence (e.g. search query)
+        scripts.append(generate_keystroke_js("hello"))
+
     if config.dwell_time:
         scripts.append(generate_dwell_js())
 

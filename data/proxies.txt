@@ -1,0 +1,20 @@
+# Proxy list — format: url|type|country
+# Rotated automatically by ProxyPool
+# US proxies (elite)
+http://143.198.135.176:80|datacenter|US
+http://167.71.182.192:80|datacenter|US
+http://173.249.210.102:80|datacenter|US
+http://20.81.205.173:80|datacenter|US
+https://46.183.25.8:443|datacenter|US
+# DE proxies (elite)
+http://128.140.113.110:8081|datacenter|DE
+http://82.165.20.115:80|datacenter|DE
+http://162.248.165.72:1080|datacenter|DE
+# CA proxy (elite)
+http://85.208.108.43:2094|datacenter|CA
+# AU proxy (elite)
+http://114.111.151.41:80|datacenter|AU
+# HK proxy (anonymous)
+http://39.109.113.97:4090|datacenter|HK
+# SG proxy (anonymous)
+http://143.42.66.91:80|datacenter|SG
