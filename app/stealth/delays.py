@@ -1,17 +1,23 @@
-"""Random delay generator."""
+"""Random delay generator for anti-detection."""
 
 from __future__ import annotations
 
 import asyncio
 import random
-from typing import Callable
+from collections.abc import Callable
 
 
-def make_delay_fn(min_ms: int = 1000, max_ms: int = 3000) -> Callable[[], float]:
-    """Return a callable that produces a random delay in *seconds* (uniform).
+def make_delay_func(min_ms: int = 1000, max_ms: int = 3000) -> Callable[[], float]:
+    """Create a callable that returns a random delay in seconds.
 
-    Each call returns a new random value between *min_ms* and *max_ms*
-    (converted to seconds).
+    Uses uniform distribution between min_ms and max_ms.
+
+    Args:
+        min_ms: Minimum delay in milliseconds.
+        max_ms: Maximum delay in milliseconds.
+
+    Returns:
+        A callable that returns a random delay in seconds each time it's called.
     """
     min_s = min_ms / 1000.0
     max_s = max_ms / 1000.0
@@ -22,6 +28,7 @@ def make_delay_fn(min_ms: int = 1000, max_ms: int = 3000) -> Callable[[], float]
     return _delay
 
 
-async def async_delay(delay_fn: Callable[[], float]) -> None:
-    """Await a delay produced by *delay_fn*."""
-    await asyncio.sleep(delay_fn())
+async def async_delay(delay_func: Callable[[], float] | None) -> None:
+    """Await a random delay if a delay function is provided."""
+    if delay_func is not None:
+        await asyncio.sleep(delay_func())

@@ -1,34 +1,46 @@
+"""Stealth configuration and profile models."""
+
 from __future__ import annotations
+
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 class StealthConfig(BaseModel):
-    """Inline stealth configuration provided per-request."""
+    """Inline stealth settings provided per-request."""
 
     user_agent: str | None = Field(
         default="random",
-        description="User-agent string or 'random' to pick from the pool",
+        description="Specific UA string, 'random' to pick from pool, or null to skip",
     )
-    headers: str | None = Field(
+    headers: Literal["realistic", "minimal"] | None = Field(
         default="realistic",
-        description="Header strategy: 'realistic' generates browser-matched headers",
+        description="Header generation strategy",
     )
     js_injection: bool = Field(
         default=True,
-        description="Inject JS patches (navigator.webdriver, etc.)",
+        description="Inject anti-detection JS (navigator.webdriver patch, etc.)",
     )
     viewport: str | None = Field(
         default="random",
-        description="Viewport preset or 'random'",
+        description="Viewport preset name, 'random', or null to use browser default",
     )
-    delay_min_ms: int = Field(default=1000, ge=0)
-    delay_max_ms: int = Field(default=3000, ge=0)
+    delay_min_ms: int = Field(
+        default=1000,
+        ge=0,
+        description="Minimum random delay between requests (ms)",
+    )
+    delay_max_ms: int = Field(
+        default=3000,
+        ge=0,
+        description="Maximum random delay between requests (ms)",
+    )
 
 
 class StealthProfile(BaseModel):
     """A named, persisted stealth configuration."""
 
-    id: str = Field(..., description="Unique profile identifier")
-    name: str = Field(default="", description="Human-friendly name")
+    id: str = Field(description="Unique profile identifier")
+    name: str = Field(default="", description="Human-readable profile name")
     config: StealthConfig = Field(default_factory=StealthConfig)

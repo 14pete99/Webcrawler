@@ -1,11 +1,20 @@
+"""Session info models."""
+
 from __future__ import annotations
 
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 class SessionInfo(BaseModel):
-    """Metadata about a persisted session."""
+    """Metadata about a persistent session."""
 
-    id: str
-    has_cookies: bool = False
-    cookie_count: int = 0
+    id: str = Field(description="Session identifier")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used: datetime = Field(default_factory=datetime.utcnow)
+    has_cookies: bool = Field(default=False, description="Whether cookie jar has entries")
+    has_browser_session: bool = Field(
+        default=False,
+        description="Whether a crawl4ai browser session exists",
+    )

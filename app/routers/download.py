@@ -30,16 +30,17 @@ async def download_endpoint(request: DownloadRequest) -> DownloadResponse:
 
     stealth = build_stealth_context(config)
     output_dir = Path(request.output_dir)
-    images = [img.model_dump() for img in request.images]
 
-    manifest, errors = await download_images(
-        images, output_dir, stealth, proxy=request.proxy
+    results = await download_images(
+        request.images, output_dir, stealth=stealth, proxy=request.proxy,
     )
+
+    errors = [r.error for r in results if r.error]
 
     return DownloadResponse(
         success=len(errors) == 0,
-        downloaded=len(manifest),
-        failed=len(errors),
-        manifest=manifest,
+        total=len(results),
+        downloaded=len(results) - len(errors),
+        results=results,
         errors=errors,
     )

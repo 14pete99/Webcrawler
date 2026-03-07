@@ -1,6 +1,6 @@
 {
   "id": "default",
-  "name": "Default Stealth Profile",
+  "name": "Default stealth profile",
   "config": {
     "user_agent": "random",
     "headers": "realistic",

@@ -1,3 +1,5 @@
-from .pipeline import build_stealth_context, StealthContext
+"""Stealth anti-detection modules."""
 
-__all__ = ["build_stealth_context", "StealthContext"]
+from .pipeline import StealthContext, build_stealth_context, merge_stealth_configs
+
+__all__ = ["StealthContext", "build_stealth_context", "merge_stealth_configs"]

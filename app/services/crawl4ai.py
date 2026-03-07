@@ -1,4 +1,4 @@
-"""Wraps the crawl4ai Docker API."""
+"""Wrapper for the crawl4ai Docker API."""
 
 from __future__ import annotations
 
@@ -8,94 +8,112 @@ from urllib.parse import urljoin
 
 import httpx
 
-from ..config import get_settings
-from ..stealth.pipeline import StealthContext
+from app.models.crawl import ImageInfo
+from app.stealth.pipeline import StealthContext
 
 
 async def crawl_url(
     url: str,
-    stealth: StealthContext,
+    api_base: str = "http://localhost:11235",
     *,
     screenshot: bool = False,
+    stealth: StealthContext | None = None,
     proxy: str | None = None,
     session_id: str | None = None,
+    output_dir: Path | None = None,
+    timeout: float = 120,
 ) -> dict:
-    """Submit a crawl request to the crawl4ai service and return the raw result dict."""
-    settings = get_settings()
+    """Submit a crawl request to crawl4ai and return parsed results.
 
-    params: dict = {
+    Args:
+        url: URL to crawl.
+        api_base: crawl4ai API base URL.
+        screenshot: Capture a rendered screenshot.
+        stealth: Assembled stealth context.
+        proxy: Proxy URL for the browser.
+        session_id: Reuse a persistent browser session.
+        output_dir: Directory to save the screenshot (if requested).
+        timeout: Request timeout in seconds.
+
+    Returns:
+        Dict with keys: success, images (list[ImageInfo]), screenshot_path, errors.
+    """
+    crawler_params: dict = {
         "cache_mode": "bypass",
         "wait_for_images": True,
         "exclude_external_images": False,
     }
     if screenshot:
-        params["screenshot"] = True
-        params["screenshot_wait_for"] = 2.0
+        crawler_params["screenshot"] = True
+        crawler_params["screenshot_wait_for"] = 2.0
 
-    # Inject stealth JS
-    if stealth.js_scripts:
-        params["js_code"] = stealth.js_scripts
-
-    browser_params: dict = {
-        "headless": True,
-        "user_agent": stealth.user_agent,
-        "viewport_width": stealth.viewport[0],
-        "viewport_height": stealth.viewport[1],
-    }
+    browser_params: dict = {"headless": True}
     if proxy:
         browser_params["proxy"] = proxy
+    if stealth:
+        if stealth.user_agent_info:
+            browser_params["user_agent"] = stealth.user_agent_info["ua"]
+        if stealth.viewport:
+            w, h = stealth.viewport
+            browser_params["viewport_width"] = w
+            browser_params["viewport_height"] = h
+        if stealth.js_injection:
+            crawler_params["js_code"] = stealth.js_injection
 
-    payload = {
+    payload: dict = {
         "urls": [url],
         "browser_config": {"type": "BrowserConfig", "params": browser_params},
-        "crawler_config": {"type": "CrawlerRunConfig", "params": params},
+        "crawler_config": {"type": "CrawlerRunConfig", "params": crawler_params},
     }
     if session_id:
         payload["session_id"] = session_id
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(f"{settings.crawl4ai_api}/crawl", json=payload)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(f"{api_base}/crawl", json=payload)
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
 
-
-def extract_images(crawl_data: dict, base_url: str) -> list[dict]:
-    """Parse crawl results and return a list of image info dicts."""
-    results = crawl_data.get("results", crawl_data.get("result", []))
+    # Parse results
+    results = data.get("results", data.get("result", []))
     if not isinstance(results, list):
         results = [results]
 
-    images: list[dict] = []
+    all_images: list[ImageInfo] = []
+    errors: list[str] = []
+    screenshot_path: str | None = None
+
     for result in results:
         if not result or not result.get("success"):
+            errors.append(result.get("error", "unknown error") if result else "empty result")
             continue
+
+        # Screenshot
+        screenshot_b64 = result.get("screenshot")
+        if screenshot_b64 and output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            ss_path = output_dir / "screenshot.png"
+            ss_path.write_bytes(base64.b64decode(screenshot_b64))
+            screenshot_path = str(ss_path)
+
+        # Images
         media = result.get("media", {})
         for img in media.get("images", []):
             src = img.get("src", "")
             if not src or src.startswith("data:"):
                 continue
             if not src.startswith(("http://", "https://")):
-                src = urljoin(base_url, src)
-            images.append({
-                "src": src,
-                "alt": img.get("alt", ""),
-                "score": img.get("score", 0),
-            })
-    return images
+                src = urljoin(url, src)
+            all_images.append(
+                ImageInfo(
+                    src=src,
+                    alt=img.get("alt", ""),
+                    score=img.get("score", 0.0),
+                )
+            )
 
-
-def extract_screenshot(crawl_data: dict, output_dir: Path) -> str | None:
-    """Save the screenshot from crawl results if present. Returns the path."""
-    results = crawl_data.get("results", crawl_data.get("result", []))
-    if not isinstance(results, list):
-        results = [results]
-
-    for result in results:
-        if not result:
-            continue
-        screenshot_b64 = result.get("screenshot")
-        if screenshot_b64:
-            screenshot_path = output_dir / "screenshot.png"
-            screenshot_path.write_bytes(base64.b64decode(screenshot_b64))
-            return str(screenshot_path)
-    return None
+    return {
+        "success": len(errors) == 0,
+        "images": all_images,
+        "screenshot_path": screenshot_path,
+        "errors": errors,
+    }

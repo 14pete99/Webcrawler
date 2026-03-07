@@ -1,62 +1,116 @@
-"""Generate realistic browser headers matched to a given user-agent."""
+"""Realistic HTTP header generation matched to user agent."""
 
 from __future__ import annotations
 
 
-def generate_headers(user_agent: str, strategy: str | None = "realistic") -> dict[str, str]:
-    """Build a header dict that looks like a real browser request.
+def build_headers(
+    ua_info: dict[str, str] | None,
+    strategy: str | None = "realistic",
+) -> dict[str, str]:
+    """Generate HTTP headers that match the given user agent.
 
-    When *strategy* is ``"realistic"`` (default), the headers are derived from
-    the user-agent string so they are internally consistent.  Any other value
-    returns a minimal set.
+    Args:
+        ua_info: Dict from user_agent.pick_user_agent (ua, browser, platform).
+        strategy: 'realistic' for full header set, 'minimal' for bare minimum,
+                  or None to return empty dict.
+
+    Returns:
+        Dict of HTTP headers.
     """
-    headers: dict[str, str] = {
-        "User-Agent": user_agent,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-    }
+    if strategy is None:
+        return {}
 
-    if strategy != "realistic":
+    headers: dict[str, str] = {}
+
+    if ua_info:
+        headers["User-Agent"] = ua_info["ua"]
+
+    if strategy == "minimal":
+        headers.setdefault("Accept", "*/*")
         return headers
 
-    # Sec-Fetch-* headers (Chromium-based browsers)
-    is_chrome = "Chrome/" in user_agent and "Edg/" not in user_agent
-    is_edge = "Edg/" in user_agent
-    is_firefox = "Firefox/" in user_agent
+    # Realistic headers
+    browser = ua_info["browser"] if ua_info else "chrome"
+    platform = ua_info["platform"] if ua_info else "desktop"
 
-    if is_chrome or is_edge:
+    headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+    headers["Accept-Language"] = "en-US,en;q=0.9"
+    headers["Accept-Encoding"] = "gzip, deflate, br"
+    headers["Cache-Control"] = "no-cache"
+    headers["Pragma"] = "no-cache"
+
+    if browser in ("chrome", "edge"):
+        headers["Sec-Ch-Ua"] = '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"'
+        headers["Sec-Ch-Ua-Mobile"] = "?1" if platform == "mobile" else "?0"
+        headers["Sec-Ch-Ua-Platform"] = _guess_platform(ua_info)
         headers["Sec-Fetch-Dest"] = "document"
         headers["Sec-Fetch-Mode"] = "navigate"
         headers["Sec-Fetch-Site"] = "none"
         headers["Sec-Fetch-User"] = "?1"
-        headers["Sec-Ch-Ua-Mobile"] = "?1" if "Mobile" in user_agent else "?0"
 
-        if is_chrome:
-            headers["Sec-Ch-Ua"] = '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"'
-            headers["Sec-Ch-Ua-Platform"] = _platform_from_ua(user_agent)
-        elif is_edge:
-            headers["Sec-Ch-Ua"] = '"Chromium";v="124", "Microsoft Edge";v="124", "Not-A.Brand";v="99"'
-            headers["Sec-Ch-Ua-Platform"] = _platform_from_ua(user_agent)
-
-    elif is_firefox:
-        headers["Sec-Fetch-Dest"] = "document"
-        headers["Sec-Fetch-Mode"] = "navigate"
-        headers["Sec-Fetch-Site"] = "none"
-        headers["Sec-Fetch-User"] = "?1"
+    headers["Upgrade-Insecure-Requests"] = "1"
 
     return headers
 
 
-def _platform_from_ua(ua: str) -> str:
+def build_image_headers(
+    ua_info: dict[str, str] | None,
+    referer: str | None = None,
+    strategy: str | None = "realistic",
+) -> dict[str, str]:
+    """Generate headers suitable for image download requests.
+
+    Args:
+        ua_info: Dict from user_agent.pick_user_agent.
+        referer: Referer URL to include.
+        strategy: Header strategy.
+
+    Returns:
+        Dict of HTTP headers.
+    """
+    if strategy is None:
+        return {}
+
+    headers: dict[str, str] = {}
+
+    if ua_info:
+        headers["User-Agent"] = ua_info["ua"]
+
+    if strategy == "minimal":
+        headers["Accept"] = "image/*,*/*;q=0.8"
+        if referer:
+            headers["Referer"] = referer
+        return headers
+
+    headers["Accept"] = "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+    headers["Accept-Language"] = "en-US,en;q=0.9"
+    headers["Accept-Encoding"] = "gzip, deflate, br"
+
+    if referer:
+        headers["Referer"] = referer
+
+    browser = ua_info["browser"] if ua_info else "chrome"
+    if browser in ("chrome", "edge"):
+        headers["Sec-Fetch-Dest"] = "image"
+        headers["Sec-Fetch-Mode"] = "no-cors"
+        headers["Sec-Fetch-Site"] = "cross-site"
+
+    return headers
+
+
+def _guess_platform(ua_info: dict[str, str] | None) -> str:
+    """Guess the Sec-Ch-Ua-Platform value from the UA string."""
+    if not ua_info:
+        return '"Windows"'
+    ua = ua_info["ua"]
     if "Windows" in ua:
         return '"Windows"'
-    if "Macintosh" in ua:
+    if "Macintosh" in ua or "Mac OS" in ua:
         return '"macOS"'
+    if "Linux" in ua and "Android" not in ua:
+        return '"Linux"'
     if "Android" in ua:
         return '"Android"'
-    if "Linux" in ua:
-        return '"Linux"'
-    return '""'
+    if "iPhone" in ua or "iPad" in ua:
+        return '"iOS"'
+    return '"Windows"'
