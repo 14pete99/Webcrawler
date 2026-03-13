@@ -1,4 +1,4 @@
-"""Crawl endpoints: POST /crawl, POST /crawl/extract."""
+"""Crawl endpoints: POST /crawl, POST /crawl/extract, POST /crawl/extract-data."""
 
 from __future__ import annotations
 
@@ -62,6 +62,7 @@ async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
             output_dir=output_dir,
             captcha_solver=captcha_solver,
             cloudflare_bypass=stealth_config.cloudflare_bypass,
+            extraction=request.extraction,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))
@@ -69,6 +70,17 @@ async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
     images = data.get("images", [])
     screenshot_path = data.get("screenshot_path")
     errors = data.get("errors", [])
+
+    # Extraction results (present when extraction config was provided)
+    extraction_fields: dict = {}
+    if data.get("extracted_data") is not None:
+        extraction_fields["extracted_data"] = data["extracted_data"]
+    if data.get("markdown") is not None:
+        extraction_fields["markdown"] = data["markdown"]
+    if data.get("html") is not None:
+        extraction_fields["html"] = data["html"]
+    if data.get("links") is not None:
+        extraction_fields["links"] = data["links"]
 
     if not request.download_images or not images:
         return CrawlResponse(
@@ -78,6 +90,7 @@ async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
             images_downloaded=0,
             screenshot_path=screenshot_path,
             errors=errors,
+            **extraction_fields,
         )
 
     dl_proxy_entry = proxy_pool.next()
@@ -101,6 +114,7 @@ async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
         manifest=manifest,
         screenshot_path=screenshot_path,
         errors=errors + dl_errors,
+        **extraction_fields,
     )
 
 
@@ -108,4 +122,15 @@ async def crawl_endpoint(request: CrawlRequest) -> CrawlResponse:
 async def crawl_extract_endpoint(request: CrawlRequest) -> CrawlResponse:
     """Crawl a URL and return image metadata without downloading."""
     request.download_images = False
+    return await crawl_endpoint(request)
+
+
+@router.post("/crawl/extract-data", response_model=CrawlResponse)
+async def crawl_extract_data_endpoint(request: CrawlRequest) -> CrawlResponse:
+    """Crawl a URL and return extracted HTML/structured data (no image downloads)."""
+    request.download_images = False
+    if request.extraction is None:
+        from ..models.extraction import ExtractionConfig
+
+        request.extraction = ExtractionConfig()
     return await crawl_endpoint(request)

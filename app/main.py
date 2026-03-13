@@ -9,7 +9,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from .config import get_settings
-from .routers import crawl, download, profiles, sessions
+from .routers import batch, crawl, download, profiles, sessions
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(batch.router)
 app.include_router(crawl.router)
 app.include_router(download.router)
 app.include_router(profiles.router)

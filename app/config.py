@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     captcha_provider: str = "2captcha"  # "2captcha" | "anticaptcha"
 
     # MinIO object storage
-    minio_endpoint: str = "localhost:9000"
+    minio_endpoint: str = "localhost:9002"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
     minio_bucket: str = "crawled-images"

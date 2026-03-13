@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from .extraction import ExtractionConfig
 from .stealth import StealthConfig
 
 
@@ -42,6 +43,10 @@ class CrawlRequest(BaseModel):
         default=None,
         description="Path to file with one proxy URL per line",
     )
+    extraction: ExtractionConfig | None = Field(
+        default=None,
+        description="Extraction config for HTML/structured data scraping",
+    )
 
 
 class CrawlResponse(BaseModel):
@@ -54,3 +59,7 @@ class CrawlResponse(BaseModel):
     manifest: list[dict] = Field(default_factory=list)
     screenshot_path: str | None = None
     errors: list[str] = Field(default_factory=list)
+    extracted_data: list[dict] | dict | None = None
+    markdown: str | None = None
+    html: str | None = None
+    links: list[dict] | None = None
