@@ -155,6 +155,22 @@
         "build_touareg_db.py"
       ],
       "api_endpoints": []
+    },
+    {
+      "id": "touareg-explorer",
+      "name": "Touareg Database Explorer",
+      "description": "Web interface for browsing, filtering, comparing, and querying scraped vehicle data",
+      "critical_files": [
+        "touareg_explorer.py"
+      ],
+      "api_endpoints": [
+        "GET /api/vehicles",
+        "GET /api/vehicle/{id}",
+        "GET /api/compare",
+        "GET /api/filters",
+        "GET /api/stats",
+        "GET /api/query"
+      ]
     }
   ]
 }
