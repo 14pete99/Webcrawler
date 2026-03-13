@@ -2,14 +2,15 @@
 
 ## Project Overview
 
-A web crawler that calls a **crawl4ai Docker service** to extract and download images from URLs.
-Currently a single-file CLI (`crawl_images.py`). Being restructured into a FastAPI API with
-modular stealth/anti-detection features — see `task-01.md` for the full restructure plan.
+A web crawler and data extraction toolkit with batch processing, structured extraction,
+and advanced anti-detection. Built on the crawl4ai Docker service. See `USER_GUIDE.md`
+for full feature documentation.
 
 ### Key Components
-- `crawl_images.py` — CLI entry point (calls crawl4ai API, downloads images)
-- `docker-compose.yml` — runs the crawl4ai Docker service on port 11235
-- `output/` — default image download directory (gitignored)
+- `crawl_images.py` — CLI entry point (single URL + batch mode)
+- `app/` — FastAPI API with routers, models, services, and stealth modules
+- `docker-compose.yml` — runs crawl4ai (port 11235), MinIO (port 9002), and the API (port 8888)
+- `output/` — default output directory (gitignored)
 
 ## Feature Preservation (CRITICAL)
 
@@ -28,7 +29,7 @@ shared files without awareness of existing functionality. These rules prevent th
 3. **When modifying shared files**, first Read the current file and preserve ALL existing
    imports, exports, route registrations, and endpoint definitions.
 
-4. **When a `FEATURES.json` manifest exists**, follow these additional rules:
+4. **When modifying features**, keep `FEATURES.json` in sync:
    - Run `python scripts/validate-features.py` before committing
    - Add entries for new features; remove entries before removing feature code
    - Never delete files listed in `critical_files` without user confirmation

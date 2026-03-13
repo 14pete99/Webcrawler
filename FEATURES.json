@@ -1,14 +1,158 @@
 {
   "$schema": "./scripts/features-schema.json",
-  "version": 1,
+  "version": 2,
   "features": [
     {
       "id": "image-crawler",
-      "name": "Image Crawler CLI",
-      "description": "Crawl a URL via crawl4ai and download discovered images",
+      "name": "Image Crawling & Download",
+      "description": "Core web crawler that discovers and downloads images from URLs via crawl4ai API",
       "critical_files": [
         "crawl_images.py",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "app/routers/crawl.py",
+        "app/services/crawl4ai.py",
+        "app/services/image_downloader.py",
+        "app/models/crawl.py"
+      ],
+      "api_endpoints": [
+        "POST /crawl",
+        "POST /crawl/extract",
+        "POST /crawl/extract-data"
+      ]
+    },
+    {
+      "id": "batch-crawling",
+      "name": "Batch Crawling",
+      "description": "Crawl multiple URLs concurrently with rate limiting, retry logic, and aggregated output",
+      "critical_files": [
+        "app/routers/batch.py",
+        "app/services/batch.py",
+        "app/models/batch.py"
+      ],
+      "api_endpoints": [
+        "POST /batch/crawl",
+        "GET /batch/{job_id}"
+      ]
+    },
+    {
+      "id": "data-extraction",
+      "name": "Data Extraction",
+      "description": "Extract structured data via CSS selectors, JSON-CSS schemas, regex patterns, and page interactions",
+      "critical_files": [
+        "app/models/extraction.py"
+      ],
+      "api_endpoints": []
+    },
+    {
+      "id": "image-compliance",
+      "name": "Image Compliance",
+      "description": "Enforce image size and dimension limits with automatic compression and tile splitting",
+      "critical_files": [
+        "app/services/image_compliance.py"
+      ],
+      "api_endpoints": []
+    },
+    {
+      "id": "image-downloader",
+      "name": "Direct Image Download",
+      "description": "Download a list of image URLs with stealth headers and proxy support",
+      "critical_files": [
+        "app/routers/download.py",
+        "app/services/image_downloader.py",
+        "app/models/download.py"
+      ],
+      "api_endpoints": [
+        "POST /download"
+      ]
+    },
+    {
+      "id": "stealth-anti-detection",
+      "name": "Stealth & Anti-Detection",
+      "description": "Browser fingerprint hardening, TLS rotation, behavioral simulation, geo consistency, and Cloudflare bypass",
+      "critical_files": [
+        "app/stealth/pipeline.py",
+        "app/stealth/fingerprint.py",
+        "app/stealth/javascript.py",
+        "app/stealth/user_agent.py",
+        "app/stealth/headers.py",
+        "app/stealth/tls.py",
+        "app/stealth/viewport.py",
+        "app/stealth/behavior.py",
+        "app/stealth/delays.py",
+        "app/stealth/referrer.py",
+        "app/stealth/cookies.py",
+        "app/stealth/geo.py",
+        "app/stealth/cloudflare.py",
+        "app/stealth/assets.py",
+        "app/models/stealth.py"
+      ],
+      "api_endpoints": []
+    },
+    {
+      "id": "captcha-solving",
+      "name": "CAPTCHA Solving",
+      "description": "Solve reCAPTCHA, hCaptcha, Turnstile, and image CAPTCHAs via 2Captcha or Anti-Captcha APIs",
+      "critical_files": [
+        "app/services/captcha.py"
+      ],
+      "api_endpoints": []
+    },
+    {
+      "id": "proxy-rotation",
+      "name": "Proxy Rotation",
+      "description": "Load and rotate proxies with type and country metadata filtering",
+      "critical_files": [
+        "app/services/proxy.py"
+      ],
+      "api_endpoints": []
+    },
+    {
+      "id": "session-persistence",
+      "name": "Session & Cookie Persistence",
+      "description": "Persist and reuse browser sessions with cookies, localStorage, and fingerprint seeds",
+      "critical_files": [
+        "app/routers/sessions.py",
+        "app/storage/sessions.py",
+        "app/models/session.py",
+        "export_cookies.py"
+      ],
+      "api_endpoints": [
+        "GET /sessions",
+        "DELETE /sessions/{session_id}"
+      ]
+    },
+    {
+      "id": "stealth-profiles",
+      "name": "Stealth Profile Management",
+      "description": "CRUD for named stealth configurations reusable across requests",
+      "critical_files": [
+        "app/routers/profiles.py",
+        "app/storage/profiles.py"
+      ],
+      "api_endpoints": [
+        "GET /profiles",
+        "GET /profiles/{profile_id}",
+        "POST /profiles",
+        "PUT /profiles/{profile_id}",
+        "DELETE /profiles/{profile_id}"
+      ]
+    },
+    {
+      "id": "minio-storage",
+      "name": "MinIO Object Storage",
+      "description": "Upload crawled images to MinIO with automatic bucket creation and presigned URLs",
+      "critical_files": [
+        "app/storage/minio_store.py"
+      ],
+      "api_endpoints": []
+    },
+    {
+      "id": "touareg-db-tools",
+      "name": "Touareg Database Tools",
+      "description": "Parse batch crawl results into structured SQLite database with vehicle specs and analytics views",
+      "critical_files": [
+        "parse_touareg_specs.py",
+        "build_touareg_db.py"
       ],
       "api_endpoints": []
     }
